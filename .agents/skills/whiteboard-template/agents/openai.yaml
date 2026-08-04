@@ -1,0 +1,6 @@
+interface:
+  display_name: "Whiteboard Template"
+  short_description: "Design modern editorial whiteboard animation"
+  default_prompt: "Use $whiteboard-template to design an editorial whiteboard animation."
+policy:
+  allow_implicit_invocation: true

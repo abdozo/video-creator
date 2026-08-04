@@ -1,0 +1,29 @@
+{
+  "id": "video-2-two-minute-rule-sketchbook",
+  "title": "Two Minute Rule Sketchbook",
+  "composition": "Video2TwoMinuteRuleSketchbook",
+  "format": {
+    "mode": "video",
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "durationSec": 60.0
+  },
+  "template": "whiteboard",
+  "narration": {
+    "mode": "none",
+    "audio": null
+  },
+  "captions": {
+    "mode": "none"
+  },
+  "vo": [],
+  "beats": [
+    {"start": 0, "end": 10, "chapter": "The problem", "visual": "A hand-drawn mountain contrasts the whole habit with its doorway."},
+    {"start": 10, "end": 20, "chapter": "The rule", "visual": "An ink-drawn timer introduces the paraphrased Two-Minute Rule."},
+    {"start": 20, "end": 30, "chapter": "Make it tiny", "visual": "Three ambitions are crossed out and translated into starter actions."},
+    {"start": 30, "end": 40, "chapter": "Lower the threshold", "visual": "A friction gate lifts and a character glyph moves forward."},
+    {"start": 40, "end": 50, "chapter": "Momentum", "visual": "The indigo idea-thread climbs through repetition checkpoints."},
+    {"start": 50, "end": 60, "chapter": "Try it now", "visual": "Three sketch cards form a checked practical plan."}
+  ]
+}

@@ -1,0 +1,55 @@
+# secrets
+.env
+
+# dependencies / build output
+node_modules/
+remotion/out/
+__pycache__/
+*.pyc
+venv/
+
+# generated media outputs
+# Keep code-native SVG artwork trackable; ignore rendered raster, video, and audio files.
+*.[pP][nN][gG]
+*.[jJ][pP][gG]
+*.[jJ][pP][eE][gG]
+*.[wW][eE][bB][pP]
+*.[gG][iI][fF]
+*.[aA][vV][iI][fF]
+*.[tT][iI][fF]
+*.[tT][iI][fF][fF]
+
+*.[mM][pP]4
+*.[mM][oO][vV]
+*.[wW][eE][bB][mM]
+*.[mM][kK][vV]
+*.[mM]4[vV]
+*.[aA][vV][iI]
+
+*.[mM][pP]3
+*.[wW][aA][vV]
+*.[mM]4[aA]
+*.[aA][aA][cC]
+*.[fF][lL][aA][cC]
+*.[oO][gG][gG]
+*.[oO][pP][uU][sS]
+*.[aA][iI][fF]
+*.[aA][iI][fF][fF]
+
+# heavy regenerable per-short artifacts:
+# voice/ = cached ElevenLabs TTS lines, output/ = rendered videos.
+# Both are rebuilt by the pipeline; finals are linked from the README instead.
+shorts/*/voice/
+shorts/*/output/
+ai-shorts/*/voice/
+ai-shorts/*/output/
+vox-shorts/*/voice/
+vox-shorts/*/output/
+
+# ai-shorts working copies of generated clips — the canonical (committed) copies
+# live in media/projects/<name>/ where the composition reads them via staticFile()
+ai-shorts/*/shots/*.mp4
+ai-shorts/*/bakeoff/*.mp4
+
+# local editor config
+.vscode/
