@@ -14,12 +14,140 @@ import subprocess
 import sys
 import time
 import wave
+from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
+
+import fcntl
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MODEL = "gemini-3.1-flash-tts-preview"
 DEFAULT_VOICE = "Charon"
 DEFAULT_ALIGN_MODEL = "base.en"
+DEFAULT_GEMINI_RPD_LIMIT = 10
+DEFAULT_GEMINI_DAILY_RESERVE = 1
+DEFAULT_GEMINI_MIN_INTERVAL_SECONDS = 31.0
+GEMINI_QUOTA_TIMEZONE = ZoneInfo("America/Los_Angeles")
+GEMINI_QUOTA_STATE = ROOT / ".cache" / "gemini-tts-quota.json"
+
+
+class GeminiQuotaError(RuntimeError):
+    """Raised before a Gemini request would consume the configured safety margin."""
+
+
+class GeminiFreeTierGuard:
+    """Locally pace and count Gemini TTS attempts against free-tier limits.
+
+    Google applies quotas per project, so requests made outside this repository cannot be
+    discovered automatically. ``used_today_baseline`` lets the caller reserve those too.
+    Every attempt is recorded before the network call because failed requests can count.
+    """
+
+    def __init__(self, model: str, *, state_path: Path = GEMINI_QUOTA_STATE,
+                 rpd_limit: int = DEFAULT_GEMINI_RPD_LIMIT,
+                 daily_reserve: int = DEFAULT_GEMINI_DAILY_RESERVE,
+                 used_today_baseline: int = 0,
+                 min_interval_seconds: float = DEFAULT_GEMINI_MIN_INTERVAL_SECONDS,
+                 now=None, sleeper=None) -> None:
+        self.model = model
+        self.state_path = state_path
+        self.rpd_limit = rpd_limit
+        self.daily_reserve = daily_reserve
+        self.used_today_baseline = used_today_baseline
+        self.min_interval_seconds = min_interval_seconds
+        self.now = now or (lambda: datetime.now(timezone.utc))
+        self.sleeper = sleeper or time.sleep
+        if self.rpd_limit < 1 or self.daily_reserve < 0:
+            raise ValueError("Gemini quota limits must be positive")
+        if self.daily_budget < 1:
+            raise ValueError("Gemini daily reserve must be smaller than the RPD limit")
+
+    @property
+    def daily_budget(self) -> int:
+        return self.rpd_limit - self.daily_reserve
+
+    def _load(self, handle) -> dict:
+        handle.seek(0)
+        raw = handle.read().strip()
+        if not raw:
+            return {"models": {}}
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise GeminiQuotaError(f"Gemini quota state is invalid: {self.state_path}") from exc
+        return data if isinstance(data, dict) else {"models": {}}
+
+    def _timestamps(self, data: dict, now: datetime) -> list[datetime]:
+        models = data.setdefault("models", {})
+        raw = models.setdefault(self.model, [])
+        parsed: list[datetime] = []
+        for value in raw:
+            try:
+                stamp = datetime.fromisoformat(value)
+                if stamp.tzinfo is None:
+                    stamp = stamp.replace(tzinfo=timezone.utc)
+                if (now - stamp).total_seconds() < 172800:
+                    parsed.append(stamp)
+            except (TypeError, ValueError):
+                continue
+        parsed.sort()
+        return parsed
+
+    def _today_count(self, timestamps: list[datetime], now: datetime) -> int:
+        today = now.astimezone(GEMINI_QUOTA_TIMEZONE).date()
+        return sum(stamp.astimezone(GEMINI_QUOTA_TIMEZONE).date() == today for stamp in timestamps)
+
+    def preflight(self, planned_requests: int) -> None:
+        """Fail before a run starts if its minimum request count cannot fit today."""
+        if planned_requests <= 0:
+            return
+        self.state_path.parent.mkdir(parents=True, exist_ok=True)
+        lock_path = self.state_path.with_suffix(self.state_path.suffix + ".lock")
+        with lock_path.open("a+", encoding="utf-8") as lock:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            with self.state_path.open("a+", encoding="utf-8") as state:
+                now = self.now()
+                used = self._today_count(self._timestamps(self._load(state), now), now)
+        available = self.daily_budget - self.used_today_baseline - used
+        if planned_requests > available:
+            raise GeminiQuotaError(
+                f"Gemini free-tier guard stopped before generation: {planned_requests} new TTS "
+                f"request(s) are needed, but only {max(0, available)} remain in today's safe "
+                f"budget ({self.daily_budget}/{self.rpd_limit}, resetting at midnight Pacific). "
+                "Reuse cached lines, wait for the reset, or choose recorded/none narration."
+            )
+
+    def reserve_request(self) -> None:
+        """Wait for RPM headroom, then durably count one request attempt."""
+        self.state_path.parent.mkdir(parents=True, exist_ok=True)
+        lock_path = self.state_path.with_suffix(self.state_path.suffix + ".lock")
+        with lock_path.open("a+", encoding="utf-8") as lock:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            with self.state_path.open("a+", encoding="utf-8") as state:
+                data = self._load(state)
+                now = self.now()
+                timestamps = self._timestamps(data, now)
+                if timestamps:
+                    wait = self.min_interval_seconds - (now - timestamps[-1]).total_seconds()
+                    if wait > 0:
+                        print(f"Gemini free-tier guard: waiting {wait:.1f}s for RPM headroom")
+                        self.sleeper(wait)
+                        now = self.now()
+                        timestamps = self._timestamps(data, now)
+                used = self._today_count(timestamps, now) + self.used_today_baseline
+                if used >= self.daily_budget:
+                    raise GeminiQuotaError(
+                        f"Gemini free-tier guard stopped at {used}/{self.daily_budget} safe daily "
+                        f"requests ({self.rpd_limit} provider limit; reset is midnight Pacific)."
+                    )
+                timestamps.append(now)
+                data.setdefault("models", {})[self.model] = [stamp.isoformat() for stamp in timestamps]
+                state.seek(0)
+                state.truncate()
+                json.dump(data, state, indent=2)
+                state.write("\n")
+                state.flush()
+                os.fsync(state.fileno())
 
 
 def load_env() -> dict[str, str]:
@@ -127,18 +255,28 @@ def write_pcm_wav(path: Path, pcm: bytes, rate: int = 24000) -> None:
         output.writeframes(pcm)
 
 
-def gemini_tts(api_key: str, model: str, voice: str, transcript: str,
-               delivery: str, output: Path) -> None:
+def continuous_tts_prompt(passages: list[tuple[str, str]]) -> str:
+    scripted = []
+    for delivery, transcript in passages:
+        direction = delivery or "clear, natural, informative"
+        scripted.append(f"[{direction}]\n{transcript}")
+    return (
+        "Synthesize one continuous narration performance using the same speaker identity, "
+        "accent, vocal character, recording perspective, and energy throughout. Interpret each "
+        "bracketed direction as acting guidance, but never speak the directions, brackets, labels, "
+        "or passage numbers aloud. Speak every transcript exactly as written. Use a brief natural "
+        "pause between passages; do not reset or introduce a new voice.\n\n"
+        + "\n\n".join(scripted)
+    )
+
+
+def gemini_tts(api_key: str, model: str, voice: str, prompt: str,
+               output: Path, quota: GeminiFreeTierGuard) -> None:
     try:
         from google import genai
         from google.genai import types
     except ImportError as exc:
         raise RuntimeError("google-genai is required for AI narration; install requirements-voice.txt") from exc
-    direction = delivery or "clear, natural, informative"
-    prompt = (
-        "Synthesize speech. Do not read the directions or labels aloud. "
-        f"Delivery: {direction}. Speak the transcript exactly as written.\nTRANSCRIPT:\n{transcript}"
-    )
     client = genai.Client(api_key=api_key)
     config = types.GenerateContentConfig(
         response_modalities=["AUDIO"],
@@ -151,6 +289,7 @@ def gemini_tts(api_key: str, model: str, voice: str, transcript: str,
     last_error: Exception | None = None
     for attempt in range(3):
         try:
+            quota.reserve_request()
             response = client.models.generate_content(model=model, contents=prompt, config=config)
             part = response.candidates[0].content.parts[0]
             data = part.inline_data.data
@@ -159,6 +298,8 @@ def gemini_tts(api_key: str, model: str, voice: str, transcript: str,
             return
         except Exception as exc:  # SDK error types vary by release.
             last_error = exc
+            if isinstance(exc, GeminiQuotaError):
+                raise
             if attempt < 2:
                 time.sleep(2 ** attempt)
     raise RuntimeError(f"Gemini TTS failed after 3 attempts: {last_error}")
@@ -199,7 +340,8 @@ def align_or_estimate(path: Path, text: str, args: argparse.Namespace,
 
 
 def prepare_ai(beats_path: Path, beats: dict, args: argparse.Namespace) -> Path:
-    key = load_env().get("GEMINI_API_KEY", "").strip()
+    env = load_env()
+    key = env.get("GEMINI_API_KEY", "").strip()
     if not key and not args.dry_run:
         raise RuntimeError("GEMINI_API_KEY is required for --mode ai")
     vo = beats.get("vo", [])
@@ -208,20 +350,68 @@ def prepare_ai(beats_path: Path, beats: dict, args: argparse.Namespace) -> Path:
     total = float(beats["format"]["durationSec"])
     cache = beats_path.parent / "voice"
     cache.mkdir(exist_ok=True)
+    passages = [delivery_and_transcript(line) for line in vo]
+    prompt = continuous_tts_prompt(passages)
+    master_digest = hashlib.sha1(
+        f"gemini-continuous-v1|{args.model}|{args.voice}|{prompt}".encode()
+    ).hexdigest()[:12]
+    master = cache / f"narration-{master_digest}.wav"
+    quota = GeminiFreeTierGuard(
+        args.model,
+        rpd_limit=int(env.get("GEMINI_TTS_RPD_LIMIT", DEFAULT_GEMINI_RPD_LIMIT)),
+        daily_reserve=int(env.get("GEMINI_TTS_DAILY_RESERVE", DEFAULT_GEMINI_DAILY_RESERVE)),
+        used_today_baseline=int(env.get("GEMINI_TTS_USED_TODAY", "0")),
+        min_interval_seconds=float(env.get(
+            "GEMINI_TTS_MIN_INTERVAL_SECONDS", DEFAULT_GEMINI_MIN_INTERVAL_SECONDS
+        )),
+    )
+    planned_requests = int(args.force or not master.exists())
+    if not args.dry_run:
+        quota.preflight(planned_requests)
+        print(
+            f"Gemini continuous narration: {planned_requests} new request(s) planned; "
+            f"safe daily budget is {quota.daily_budget}/{quota.rpd_limit}"
+        )
+    if args.dry_run:
+        for index, (delivery, transcript) in enumerate(passages):
+            print(f"{index:02d} {float(vo[index]['start']):7.2f}s {args.voice} [{delivery}]: {transcript}")
+        return narration_output(beats_path, beats)
+    if args.force or not master.exists():
+        gemini_tts(key, args.model, args.voice, prompt, master, quota)
+
+    master_duration = duration(master)
+    full_transcript = " ".join(transcript for _, transcript in passages)
+    master_words, coverage = align_or_estimate(
+        master, full_transcript, args, 0.0, master_duration
+    )
+    if len(master_words) != sum(len(transcript.split()) for _, transcript in passages):
+        raise RuntimeError("continuous narration alignment did not return every authored word")
+
     fitted: list[tuple[Path, float]] = []
+    word_cursor = 0
     for index, line in enumerate(vo):
-        delivery, transcript = delivery_and_transcript(line)
-        digest = hashlib.sha1(f"gemini|{args.model}|{args.voice}|{delivery}|{transcript}".encode()).hexdigest()[:10]
+        _, transcript = passages[index]
+        word_count = len(transcript.split())
+        line_words = master_words[word_cursor:word_cursor + word_count]
+        word_cursor += word_count
+        if not line_words:
+            raise RuntimeError(f"continuous narration produced no aligned words for line {index}")
+        segment_start = max(0.0, float(line_words[0]["start"]) - .04)
+        segment_end = min(master_duration, float(line_words[-1]["end"]) + .10)
+        digest = hashlib.sha1(
+            f"gemini-continuous-segment-v1|{master_digest}|{index}|{transcript}".encode()
+        ).hexdigest()[:10]
         raw = cache / f"line-{index:02d}-{digest}.wav"
         start = float(line["start"])
         next_start = float(vo[index + 1]["start"]) if index + 1 < len(vo) else total - .2
         window = max(.2, next_start - start - .05)
         fit = cache / f"line-{index:02d}-{digest}-fit-{round(window * 1000)}ms.wav"
-        if args.dry_run:
-            print(f"{index:02d} {start:7.2f}s {args.voice}: {transcript}")
-            continue
         if args.force or not raw.exists():
-            gemini_tts(key, args.model, args.voice, transcript, delivery, raw)
+            run([
+                "ffmpeg", "-y", "-v", "error", "-i", str(master),
+                "-af", f"atrim=start={segment_start:.6f}:end={segment_end:.6f},asetpts=PTS-STARTPTS",
+                "-ar", "24000", "-ac", "1", str(raw),
+            ])
         raw_duration = duration(raw)
         tempo = min(1.3, raw_duration / window) if raw_duration > window else 1.0
         if args.force or not fit.exists():
@@ -233,12 +423,13 @@ def prepare_ai(beats_path: Path, beats: dict, args: argparse.Namespace) -> Path:
                 f"but its scene window is {window:.2f}s; retime the scene or shorten the line"
             )
         line["end"] = round(start + fitted_duration, 3)
-        raw_words, coverage = align_or_estimate(raw, transcript, args, 0.0, raw_duration)
-        line["words"] = [{"w": word["w"], "start": round(start + word["start"] / tempo, 3), "end": round(start + word["end"] / tempo, 3)} for word in raw_words]
+        line["words"] = [{
+            "w": word["w"],
+            "start": round(start + max(0.0, word["start"] - segment_start) / tempo, 3),
+            "end": round(start + max(0.0, word["end"] - segment_start) / tempo, 3),
+        } for word in line_words]
         line["alignmentCoverage"] = round(coverage, 3)
         fitted.append((fit, start))
-    if args.dry_run:
-        return narration_output(beats_path, beats)
     output = narration_output(beats_path, beats)
     output.parent.mkdir(parents=True, exist_ok=True)
     inputs: list[str] = []
@@ -251,7 +442,7 @@ def prepare_ai(beats_path: Path, beats: dict, args: argparse.Namespace) -> Path:
         labels.append(f"[a{index}]")
     filters.append(f"{''.join(labels)}amix=inputs={len(labels)}:normalize=0,apad,atrim=0:{total},loudnorm=I=-16:TP=-1.5:LRA=11[out]")
     run(["ffmpeg", "-y", "-v", "error", *inputs, "-filter_complex", ";".join(filters), "-map", "[out]", "-c:a", "aac", "-b:a", "192k", str(output)])
-    beats["voiceStatus"] = f"gemini:{args.model}:{args.voice}"
+    beats["voiceStatus"] = f"gemini-continuous:{args.model}:{args.voice}"
     return output
 
 

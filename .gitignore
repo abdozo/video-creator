@@ -1,5 +1,6 @@
 # secrets
 .env
+.cache/
 
 # dependencies / build output
 node_modules/
@@ -7,6 +8,11 @@ remotion/out/
 __pycache__/
 *.pyc
 venv/
+
+# locally produced videos
+# Historical examples already committed remain tracked; new numbered productions stay local.
+/videos/video-[0-9]*/
+/remotion/src/shots/video-[0-9]*/
 
 # generated media outputs
 # Keep code-native SVG artwork trackable; ignore rendered raster, video, and audio files.

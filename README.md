@@ -106,6 +106,15 @@ node scripts/render-all.mjs <CompositionId> --scale=1
 - `GEMINI_API_KEY`: AI narration.
 - `FAL_KEY`: preserved generative-video workflows.
 
+Gemini narration is generated as one continuous performance per video, then split, fitted, and
+word-aligned locally into the authored scene windows. This keeps the same speaker identity across
+scenes, gives captions and visual cues exact timestamps, and normally costs one API request for the
+entire voiceover. A local free-tier guard waits 31 seconds between attempts and stops after 9
+requests per Pacific-time day, leaving one request of the current 10-RPD limit unused. Usage is
+stored in `.cache/gemini-tts-quota.json`; cached narration does not consume requests. If the same Google AI Studio project is used elsewhere, set
+`GEMINI_TTS_USED_TODAY` to that outside usage before generating. The limits and reserve can be
+adjusted in `.env` when AI Studio reports different quotas.
+
 Recorded and silent motion/whiteboard projects require no AI API key. Reuse bundled SFX/music
 first. New free or user-owned audio must be imported with source and license provenance using
 `tools/import_audio.py`. ElevenLabs is retained only in historical artifacts and legacy scripts;

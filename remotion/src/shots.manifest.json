@@ -128,6 +128,14 @@
   "transparent": false
  },
  {
+  "id": "Video3MakeGoodHabitsObvious",
+  "durationInSeconds": 60,
+  "fps": 30,
+  "width": 1920,
+  "height": 1080,
+  "transparent": false
+ },
+ {
   "id": "EnglishLessonDemo",
   "durationInSeconds": 15,
   "fps": 30,

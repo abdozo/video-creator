@@ -16,9 +16,10 @@ import Shot12, { compositionConfig as cfg12 } from './shots/short-9/Short9Chords
 import Shot13, { compositionConfig as cfg13 } from './shots/short-demo-whiteboard/WhiteboardShortDemo';
 import Shot14, { compositionConfig as cfg14 } from './shots/video-1/Video1TwoMinuteRule';
 import Shot15, { compositionConfig as cfg15 } from './shots/video-2/Video2TwoMinuteRuleSketchbook';
-import Shot16, { compositionConfig as cfg16 } from './shots/video-demo-english/EnglishLessonDemo';
-import Shot17, { compositionConfig as cfg17 } from './shots/video-demo-whiteboard/WhiteboardVideoDemo';
-import Shot18, { compositionConfig as cfg18 } from './shots/vox-1/Vox1Coffee';
+import Shot16, { compositionConfig as cfg16 } from './shots/video-3/Video3MakeGoodHabitsObvious';
+import Shot17, { compositionConfig as cfg17 } from './shots/video-demo-english/EnglishLessonDemo';
+import Shot18, { compositionConfig as cfg18 } from './shots/video-demo-whiteboard/WhiteboardVideoDemo';
+import Shot19, { compositionConfig as cfg19 } from './shots/vox-1/Vox1Coffee';
 
 export const shots: { Comp: React.FC; config: any }[] = [
   { Comp: Shot0 as React.FC, config: cfg0 },
@@ -40,4 +41,5 @@ export const shots: { Comp: React.FC; config: any }[] = [
   { Comp: Shot16 as React.FC, config: cfg16 },
   { Comp: Shot17 as React.FC, config: cfg17 },
   { Comp: Shot18 as React.FC, config: cfg18 },
+  { Comp: Shot19 as React.FC, config: cfg19 },
 ];
