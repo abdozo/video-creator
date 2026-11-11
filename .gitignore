@@ -1,22 +1,47 @@
-# secrets
+# Local environment and credentials
 .env
-.cache/
+.env.*
+!.env.example
+!.env.*.example
 
-# dependencies / build output
+# Dependencies, caches, and build output
 node_modules/
-remotion/out/
-__pycache__/
-*.pyc
+.cache/
+.remotion/
+/.fallow/
+/remotion/out/
+*.tsbuildinfo
+npm-debug.log*
+
+# Python environments and tooling
+.venv/
 venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
 
-# locally produced videos
-# Historical examples already committed remain tracked; new numbered productions stay local.
-/videos/video-[0-9]*/
-/remotion/src/shots/video-[0-9]*/
+# Local productions: scripts, prompts, metadata, assets, and compositions.
+# Ignore whole roots so arbitrary project names and file types stay local.
+/videos/
+/shorts/
+/ai-shorts/*/
+/vox-shorts/*/
+/media/projects/
+/remotion/src/shots/
+/remotion/src/registry.gen.tsx
+/remotion/src/shots.manifest.json
+/remotion/scripts/render-nvidia-comedy.mjs
+/docs/rubai-animated-remake.prompt.txt
 
-# generated media outputs
-# Keep code-native SVG artwork trackable; ignore rendered raster, video, and audio files.
+# Local raster, video, and audio files.
+# Only the shared whiteboard template reference is allowed below.
 *.[pP][nN][gG]
+!/media/templates/classic-whiteboard/reference.png
 *.[jJ][pP][gG]
 *.[jJ][pP][eE][gG]
 *.[wW][eE][bB][pP]
@@ -42,20 +67,18 @@ venv/
 *.[aA][iI][fF]
 *.[aA][iI][fF][fF]
 
-# heavy regenerable per-short artifacts:
-# voice/ = cached ElevenLabs TTS lines, output/ = rendered videos.
-# Both are rebuilt by the pipeline; finals are linked from the README instead.
-shorts/*/voice/
-shorts/*/output/
-ai-shorts/*/voice/
-ai-shorts/*/output/
-vox-shorts/*/voice/
-vox-shorts/*/output/
+# Per-short narration caches and render output
+/shorts/*/voice/
+/shorts/*/output/
+/ai-shorts/*/voice/
+/ai-shorts/*/output/
+/vox-shorts/*/voice/
+/vox-shorts/*/output/
 
-# ai-shorts working copies of generated clips — the canonical (committed) copies
-# live in media/projects/<name>/ where the composition reads them via staticFile()
-ai-shorts/*/shots/*.mp4
-ai-shorts/*/bakeoff/*.mp4
-
-# local editor config
+# OS and editor files
+.DS_Store
+._*
+Thumbs.db
+.idea/
 .vscode/
+*.swp

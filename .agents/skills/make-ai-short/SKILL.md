@@ -53,8 +53,10 @@ media/projects/<name>/        — THE clip copies for staticFile() (committed �
    (blue-man #1: "arrival is a myth" → ending = walking toward the same door). ~80-100 words,
    2.5-2.7 wps windows. **No engagement-CTA outro, ever** — end on the payoff, loop is the ending.
 2. **Narration FIRST when used** — `python tools/prepare_narration.py --beats ... --emit-ts
-   remotion/src/shots/ai-N/vo.gen.ts`. Use Gemini `Charon`, a user recording, or `none` as the
-   project specifies. Real aligned word times decide the
+   remotion/src/shots/ai-N/vo.gen.ts`. AI mode sends the entire Short as one continuous Gemini
+   performance, not one request per shot, then splits and aligns locally. Reuse the cached master;
+   use `--force` only when deliberately spending one new request. Use Gemini `Charon`, a user
+   recording, or `none` as the project specifies. Real aligned word times decide the
    shot windows; Seedance takes integer 4-12s durations, so round shot lengths UP from windows.
 3. **Start frames** — one per shot, using `$imagegen` with `character.png` attached
    (+ the shot-1 scene still as a second reference when a location/prop must match across shots).

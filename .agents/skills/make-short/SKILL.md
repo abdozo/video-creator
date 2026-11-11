@@ -1,6 +1,6 @@
 ---
 name: make-short
-description: Build a vertical 1080x1920 Remotion Short from a topic using code-native motion graphics or the modern whiteboard template, with AI, recorded, or no narration. Use for "make a short", YouTube Shorts, Reels, TikTok explainers, vertical English lessons, or whiteboard Shorts. Use make-video for regular horizontal videos, make-ai-short for video-model pixels, and make-vox for layered collage.
+description: Build a vertical 1080x1920 Remotion Short from a topic using code-native motion graphics or the classic whiteboard template, with AI, recorded, or no narration. Use for "make a short", YouTube Shorts, Reels, TikTok explainers, vertical English lessons, or whiteboard Shorts. Use make-video for regular horizontal videos, make-ai-short for video-model pixels, and make-vox for layered collage.
 ---
 
 # Make a Short
@@ -8,6 +8,8 @@ description: Build a vertical 1080x1920 Remotion Short from a topic using code-n
 Run from the repository root. Read `AGENTS.md`, `brand.md`, and
 `vidtsx-2d-generator/SKILL.md`. Read `references/production-craft.md` when designing or
 continuing a full Short. For whiteboard requests also use `$whiteboard-template`.
+For `lines-anime`, Lines Anime, or animating a supplied illustration, follow
+`media/templates/lines-anime/README.md` using the `motion` scaffold.
 
 ## Initialize
 
@@ -29,7 +31,11 @@ or approves a real raster asset.
 2. Use one persistent Remotion canvas and Sequence-based scenes. Keep UI-safe areas from
    `lib/shorts.tsx`; frames inside Sequences are local.
 3. Narration:
-   - `ai`: `python tools/prepare_narration.py --mode ai --beats ... --emit-ts .../vo.gen.ts`
+   - `ai`: `python tools/prepare_narration.py --mode ai --beats ... --emit-ts .../vo.gen.ts`.
+     This generates one continuous Gemini performance for the entire Short, then locally splits,
+     fits, and aligns it. Never issue one request per line. Generate it before locking visual cues,
+     and drive captions/reveals from `vo.gen.ts` real word times. Reuse its cache; use `--force`
+     only when intentionally spending one new request.
    - `recorded`: approve the script, then `--mode recorded --audio <file>`.
    - `none`: author explicit scene durations; omit Audio and captions.
 4. Caption defaults: `word-highlight` when narration exists, otherwise `none`. Teaching text is

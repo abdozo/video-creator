@@ -88,7 +88,10 @@ Then `node scripts/render-all.mjs VoxNName --scale=1` and spot-check frames FROM
 ## Stage 5 — voice
 
 `python tools/prepare_narration.py --beats … --emit-ts` exactly as make-short Stage 4. It supports
-Gemini AI narration, a user recording, or silence. Use word-exact captions only when requested;
+Gemini AI narration, a user recording, or silence. AI mode generates the whole Short as one
+continuous, identity-locked Gemini performance, then splits and aligns it locally; never call TTS
+once per scene. Generate before locking camera/scene cues, reuse the cached master, and reserve
+`--force` for an intentional one-request regeneration. Use word-exact captions only when requested;
 documentary style often runs caption-free.
 
 ## Stage 6 — SFX/music (suggest-sfx machinery)

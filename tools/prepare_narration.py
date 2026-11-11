@@ -185,7 +185,8 @@ def delivery_and_transcript(line: dict) -> tuple[str, str]:
 
 
 def normalize_word(word: str) -> str:
-    return re.sub(r"[^a-z0-9']+", "", word.lower().replace("’", "'"))
+    normalized = word.lower().replace("’", "'").translate(str.maketrans("أإآٱى", "ااااي"))
+    return "".join(char for char in normalized if char.isalnum() or char == "'")
 
 
 def estimate_words(text: str, start: float, end: float) -> list[dict]:
@@ -222,11 +223,18 @@ def map_words(text: str, recognized: list[dict], start: float = 0.0,
             matched += 1
     coverage = matched / max(1, len(authored))
     fallback_end = end if end is not None else (start + float(recognized[-1]["end"]) if recognized else start + max(1, len(authored)) * .35)
-    estimated = estimate_words(text, start, fallback_end)
-    # Interpolate unmatched words between their nearest aligned neighbors.
-    for index, value in enumerate(mapped):
-        if value is None:
-            mapped[index] = estimated[index]
+    index = 0
+    previous_end = start
+    while index < len(mapped):
+        if mapped[index] is not None:
+            previous_end = mapped[index]["end"]
+            index += 1
+            continue
+        first = index
+        while index < len(mapped) and mapped[index] is None:
+            index += 1
+        next_start = mapped[index]["start"] if index < len(mapped) else fallback_end
+        mapped[first:index] = estimate_words(" ".join(authored[first:index]), previous_end, max(previous_end, next_start))
     return [word for word in mapped if word is not None], coverage
 
 
@@ -244,6 +252,44 @@ def whisper_words(path: Path, model_name: str, language: str | None) -> tuple[li
         for word in segment.words or []:
             words.append({"word": word.word.strip(), "start": word.start, "end": word.end})
     return words, segment_rows
+
+
+def force_align_segments(path: Path, text: str, model_name: str,
+                         language: str | None, segments_path: Path) -> list[dict]:
+    """Align supplied text against audio attention inside reviewed utterance windows.
+
+    This does not synthesize audio or estimate word durations. Window boundaries
+    come from a reviewed transcription of the continuous master.
+    """
+    from faster_whisper import WhisperModel
+    from faster_whisper.audio import decode_audio, pad_or_trim
+    from faster_whisper.tokenizer import Tokenizer
+
+    segments = json.loads(segments_path.read_text(encoding="utf-8"))
+    if " ".join(s["text"] for s in segments).split() != text.split():
+        raise RuntimeError("Forced-alignment segments must contain the exact full transcript")
+    model = WhisperModel(model_name, device="auto", compute_type="int8")
+    tokenizer = Tokenizer(model.hf_tokenizer, multilingual=model.model.is_multilingual,
+                          task="transcribe", language=language or "ar")
+    audio = decode_audio(str(path), sampling_rate=16000)
+    words = []
+    previous_end = 0.0
+    for segment in segments:
+        start, end = float(segment["start"]), float(segment["end"])
+        tokens = tokenizer.encode(segment["text"])
+        if start < previous_end or end <= start or end-start > 30 or len(tokens) > 400:
+            raise RuntimeError("Forced-alignment windows must be ordered, <=30s and <=400 tokens")
+        if end > len(audio)/16000 + .05:
+            raise RuntimeError("Forced-alignment window exceeds the audio duration")
+        features = model.feature_extractor(audio[round(start*16000):round(end*16000)])
+        aligned = model.find_alignment(tokenizer, [tokens], model.encode(pad_or_trim(features)), features.shape[-1])[0]
+        for word in aligned:
+            if normalize_word(word["word"]):
+                words.append({"word": word["word"].strip(),
+                              "start": start+float(word["start"]),
+                              "end": min(end, start+float(word["end"]))})
+        previous_end = end
+    return words
 
 
 def write_pcm_wav(path: Path, pcm: bytes, rate: int = 24000) -> None:
@@ -270,7 +316,7 @@ def continuous_tts_prompt(passages: list[tuple[str, str]]) -> str:
     )
 
 
-def gemini_tts(api_key: str, model: str, voice: str, prompt: str,
+def gemini_tts(api_key: str, model: str, voice: str | dict[str, str], prompt: str,
                output: Path, quota: GeminiFreeTierGuard) -> None:
     try:
         from google import genai
@@ -278,14 +324,16 @@ def gemini_tts(api_key: str, model: str, voice: str, prompt: str,
     except ImportError as exc:
         raise RuntimeError("google-genai is required for AI narration; install requirements-voice.txt") from exc
     client = genai.Client(api_key=api_key)
-    config = types.GenerateContentConfig(
-        response_modalities=["AUDIO"],
-        speech_config=types.SpeechConfig(
-            voice_config=types.VoiceConfig(
-                prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=voice)
-            )
-        ),
+    def voice_config(name: str) -> types.VoiceConfig:
+        return types.VoiceConfig(prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=name))
+
+    speech = types.SpeechConfig(voice_config=voice_config(voice)) if isinstance(voice, str) else types.SpeechConfig(
+        multi_speaker_voice_config=types.MultiSpeakerVoiceConfig(speaker_voice_configs=[
+            types.SpeakerVoiceConfig(speaker=speaker, voice_config=voice_config(name))
+            for speaker, name in voice.items()
+        ])
     )
+    config = types.GenerateContentConfig(response_modalities=["AUDIO"], speech_config=speech)
     last_error: Exception | None = None
     for attempt in range(3):
         try:
@@ -327,7 +375,11 @@ def emit_ts(vo: list[dict], path: Path) -> None:
 def align_or_estimate(path: Path, text: str, args: argparse.Namespace,
                       offset: float = 0.0, known_end: float | None = None) -> tuple[list[dict], float]:
     try:
-        recognized, _ = whisper_words(path, args.align_model, args.language)
+        segments_path = getattr(args, "alignment_segments", None)
+        if segments_path:
+            recognized = force_align_segments(path, text, args.align_model, args.language, Path(segments_path))
+        else:
+            recognized, _ = whisper_words(path, args.align_model, args.language)
         words, coverage = map_words(text, recognized, offset, known_end)
     except RuntimeError:
         if not args.allow_estimated_alignment:
@@ -351,11 +403,40 @@ def prepare_ai(beats_path: Path, beats: dict, args: argparse.Namespace) -> Path:
     cache = beats_path.parent / "voice"
     cache.mkdir(exist_ok=True)
     passages = [delivery_and_transcript(line) for line in vo]
-    prompt = continuous_tts_prompt(passages)
-    master_digest = hashlib.sha1(
-        f"gemini-continuous-v1|{args.model}|{args.voice}|{prompt}".encode()
-    ).hexdigest()[:12]
-    master = cache / f"narration-{master_digest}.wav"
+    casts = (beats.get("narration") or {}).get("casts")
+    performances = []
+    if casts:
+        if any(len(cast) != 2 for cast in casts) or any(
+            sum(line.get("speaker") in cast for cast in casts) != 1 for line in vo
+        ):
+            raise RuntimeError("Each dialogue line needs one matching two-speaker cast")
+        for cast in casts:
+            indices = [index for index, line in enumerate(vo) if line["speaker"] in cast]
+            if not indices:
+                continue
+            turns = "\n\n".join(
+                f"{vo[index]['speaker']}: [{passages[index][0] or 'natural'}]\n{passages[index][1]}"
+                for index in indices
+            )
+            prompt = (
+                "Perform the following dialogue in clear Modern Standard Arabic. Speak only the Arabic "
+                "lines, exactly as written, in their given order. Never speak names, labels, or bracketed "
+                "acting directions. Keep each speaker's configured voice fixed, with a short natural pause "
+                "between lines. No music or effects.\n\n" + turns
+            )
+            performances.append((cast, indices, prompt))
+    else:
+        prompt = (
+            "\n\n".join(transcript for _, transcript in passages)
+            if getattr(args, "transcript_only", False)
+            else continuous_tts_prompt(passages)
+        )
+        performances.append((args.voice, list(range(len(vo))), prompt))
+
+    masters = []
+    for voice, indices, prompt in performances:
+        digest = hashlib.sha1(f"gemini-continuous-v1|{args.model}|{voice}|{prompt}".encode()).hexdigest()[:12]
+        masters.append((cache / f"narration-{digest}.wav", digest, voice, indices, prompt))
     quota = GeminiFreeTierGuard(
         args.model,
         rpd_limit=int(env.get("GEMINI_TTS_RPD_LIMIT", DEFAULT_GEMINI_RPD_LIMIT)),
@@ -365,7 +446,7 @@ def prepare_ai(beats_path: Path, beats: dict, args: argparse.Namespace) -> Path:
             "GEMINI_TTS_MIN_INTERVAL_SECONDS", DEFAULT_GEMINI_MIN_INTERVAL_SECONDS
         )),
     )
-    planned_requests = int(args.force or not master.exists())
+    planned_requests = sum(args.force or not master.exists() for master, *_ in masters)
     if not args.dry_run:
         quota.preflight(planned_requests)
         print(
@@ -374,28 +455,28 @@ def prepare_ai(beats_path: Path, beats: dict, args: argparse.Namespace) -> Path:
         )
     if args.dry_run:
         for index, (delivery, transcript) in enumerate(passages):
-            print(f"{index:02d} {float(vo[index]['start']):7.2f}s {args.voice} [{delivery}]: {transcript}")
+            print(f"{index:02d} {float(vo[index]['start']):7.2f}s {vo[index].get('speaker', args.voice)} [{delivery}]: {transcript}")
         return narration_output(beats_path, beats)
-    if args.force or not master.exists():
-        gemini_tts(key, args.model, args.voice, prompt, master, quota)
-
-    master_duration = duration(master)
-    full_transcript = " ".join(transcript for _, transcript in passages)
-    master_words, coverage = align_or_estimate(
-        master, full_transcript, args, 0.0, master_duration
-    )
-    if len(master_words) != sum(len(transcript.split()) for _, transcript in passages):
-        raise RuntimeError("continuous narration alignment did not return every authored word")
+    aligned = {}
+    for master, digest, voice, indices, prompt in masters:
+        if args.force or not master.exists():
+            gemini_tts(key, args.model, voice, prompt, master, quota)
+        master_duration = duration(master)
+        transcript = " ".join(passages[index][1] for index in indices)
+        master_words, coverage = align_or_estimate(master, transcript, args, 0.0, master_duration)
+        word_cursor = 0
+        for index in indices:
+            word_count = len(passages[index][1].split())
+            line_words = master_words[word_cursor:word_cursor + word_count]
+            if not line_words or len(line_words) != word_count:
+                raise RuntimeError(f"Continuous narration did not align every word on line {index}")
+            aligned[index] = (master, digest, master_duration, line_words, coverage)
+            word_cursor += word_count
 
     fitted: list[tuple[Path, float]] = []
-    word_cursor = 0
     for index, line in enumerate(vo):
         _, transcript = passages[index]
-        word_count = len(transcript.split())
-        line_words = master_words[word_cursor:word_cursor + word_count]
-        word_cursor += word_count
-        if not line_words:
-            raise RuntimeError(f"continuous narration produced no aligned words for line {index}")
+        master, master_digest, master_duration, line_words, coverage = aligned[index]
         segment_start = max(0.0, float(line_words[0]["start"]) - .04)
         segment_end = min(master_duration, float(line_words[-1]["end"]) + .10)
         digest = hashlib.sha1(
@@ -442,7 +523,7 @@ def prepare_ai(beats_path: Path, beats: dict, args: argparse.Namespace) -> Path:
         labels.append(f"[a{index}]")
     filters.append(f"{''.join(labels)}amix=inputs={len(labels)}:normalize=0,apad,atrim=0:{total},loudnorm=I=-16:TP=-1.5:LRA=11[out]")
     run(["ffmpeg", "-y", "-v", "error", *inputs, "-filter_complex", ";".join(filters), "-map", "[out]", "-c:a", "aac", "-b:a", "192k", str(output)])
-    beats["voiceStatus"] = f"gemini-continuous:{args.model}:{args.voice}"
+    beats["voiceStatus"] = f"gemini-continuous:{args.model}:{'cast' if casts else args.voice}"
     return output
 
 
@@ -487,6 +568,10 @@ def parser() -> argparse.ArgumentParser:
     ap.add_argument("--audio", help="recorded narration file")
     ap.add_argument("--model", default=DEFAULT_MODEL)
     ap.add_argument("--voice", default=DEFAULT_VOICE)
+    ap.add_argument("--alignment-segments", type=Path,
+                    help="JSON of reviewed master-audio utterance windows for forced word alignment")
+    ap.add_argument("--transcript-only", action="store_true",
+                    help="send only the spoken text for a single voice")
     ap.add_argument("--align-model", default=DEFAULT_ALIGN_MODEL)
     ap.add_argument("--language", default="en")
     ap.add_argument("--emit-ts")

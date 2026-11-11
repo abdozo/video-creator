@@ -9,7 +9,7 @@ main skill supports the new provider and template choices.
 shorts/short-N-<niche>/
   script.md        hook, beat table, and production notes
   beats.json       format, narration, captions, timed vo[], and visual beats
-  voice/           cached per-line narration working files
+  voice/           cached continuous narration master + locally split working files
   sfx-plan.json    global-timeline cue sheet
   output/          final auditions and exports
 remotion/src/shots/short-N/
@@ -50,7 +50,10 @@ contrast, and loop continuity. Only then render at scale 1.
 ## Narration and captions
 
 Use `tools/prepare_narration.py` with `ai`, `recorded`, or `none`. AI and recorded modes write exact
-local alignment into `beats.json` and optionally `vo.gen.ts`. Never keep estimated word timing when
+local alignment into `beats.json` and optionally `vo.gen.ts`. AI mode makes one identity-locked
+Gemini request for the full performance, then splits and fits passages locally; never loop over VO
+lines. Generate narration before locking scene and reveal cues, reuse the cached master, and use
+`--force` only for an intentional one-request regeneration. Never keep estimated word timing when
 aligned audio exists. Shorts with narration default to word-highlight captions; silent Shorts do
 not mount captions or audio.
 
