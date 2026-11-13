@@ -43,6 +43,22 @@ def tsx_source(project_id: str, component_id: str, config: dict, template: str,
     starter_content = ""
     audio_condition = "NARRATION"
     caption_lines = "VO"
+    if template == "dawah-clips":
+        return f'''import React from 'react';
+import {{DawahClip, type DawahClipData}} from '../../lib/dawah-clips';
+import data from './clip.json';
+
+export const compositionConfig = {{
+  id: '{component_id}',
+  durationInSeconds: {config['durationSec']},
+  fps: 30,
+  width: 1080,
+  height: 1920,
+}};
+
+const {component_id}: React.FC = () => <DawahClip data={{data as DawahClipData}} />;
+export default {component_id};
+'''
     if template == "company-analysis":
         body_import = "import {CompanyAnalysis, demoAnalysis} from '../../lib/company-analysis';"
         body = "<CompanyAnalysis data={demoAnalysis} />"
@@ -131,6 +147,8 @@ def create(args: argparse.Namespace) -> dict:
     is_short = args.format == "short"
     if template == "company-analysis" and is_short:
         raise SystemExit("company-analysis requires --format video (1920x1080)")
+    if template == "dawah-clips" and (not is_short or args.narration == "ai"):
+        raise SystemExit("dawah-clips requires --format short and recorded or none narration")
     parent = root / ("shorts" if is_short else "videos")
     prefix = "short" if is_short else "video"
     number = args.number or next_number(parent, prefix)
@@ -195,6 +213,14 @@ def create(args: argparse.Namespace) -> dict:
         tsx_source(project_id, component_id, config, template, narration_audio, caption_mode, comic_art, language),
         encoding="utf-8",
     )
+    if template == "dawah-clips":
+        (shot_dir / "clip.json").write_text(json.dumps({
+            "title": "عنوان المقطع", "captionMode": "none", "captions": [], "emphasis": [],
+        }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        beats["language"] = "ar"
+        beats["narration"] = {"mode": args.narration, "audio": None, "embedded": True}
+        beats["captions"] = {"mode": "none"}
+        (project_dir / "beats.json").write_text(json.dumps(beats, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return {
         "id": project_id,
         "project": str(project_dir.relative_to(root)),
@@ -206,7 +232,7 @@ def create(args: argparse.Namespace) -> dict:
 def parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--format", choices=("short", "video"), required=True)
-    ap.add_argument("--template", choices=("motion", "whiteboard", "company-analysis", *COMIC_TEMPLATES), default="motion",
+    ap.add_argument("--template", choices=("motion", "whiteboard", "company-analysis", "dawah-clips", *COMIC_TEMPLATES), default="motion",
                     help="motion-comic is a legacy alias for motion-comic-static")
     ap.add_argument("--comic-image", type=Path, help="initial page image for either comic template")
     ap.add_argument("--language", choices=("ar", "en"), help="comic language and reading direction (default: en)")

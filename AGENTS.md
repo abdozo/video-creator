@@ -5,6 +5,13 @@ repository root. Preserve existing examples and their historical provider metada
 
 ## Workflow routing
 
+- For `dawah-clips`, religious lesson clips, or batches extracted from a sermon, read
+  [the Dawah clips guide](media/templates/dawah-clips/README.md) before selecting passages.
+  Assemble each Short as a story from anywhere in the full transcript, using `keep`
+  in final playback order. Do not assume one Short is one continuous source excerpt.
+  Trim only verified silence without clipping speech. Honor paper-only/no-caption mode,
+  animate paper cues, and follow the guide's non-musical SFX sourcing and review workflow.
+
 - `$make-short`: vertical 1080x1920 Shorts. Templates: `motion` or `whiteboard`.
 - `$make-video`: horizontal 1920x1080 regular YouTube videos. For comic pages, follow [Motion Comic Static](README.md#motion-comic-static) for still art or [Motion Graphic Animated](README.md#motion-graphic-animated) for Rigby2D character and prop animation.
 - `$make-ai-short`: optional fal.ai video-model pixels.

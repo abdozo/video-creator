@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "status": "review-preview-not-approved",
+  "source": {
+    "video": "/Users/abdozo/Documents/Apps/video-creator/projects_assets/Arta7/نفسي أرتاح _ _ أسباب الراحة في الحياة _ _ #خطبة_جمعة _ د . حازم شومان.mp4",
+    "url": "",
+    "speaker": "د. حازم شومان"
+  },
+  "transcript": "transcript.draft.json",
+  "clips": [
+    {
+      "slug": "before-the-door-opens",
+      "title": "أوعى تمشي قبل ما الباب يتفتح",
+      "start": 1537.92,
+      "end": 1634.16,
+      "reason": "This continuous passage already tells the complete delayed-answer story: question, doctor analogy, persistence and payoff. Other provision/opening passages in the full lesson do not strengthen that specific argument. Review preview only.",
+      "keep": [
+        {
+          "start": 1537.92,
+          "end": 1634.16,
+          "role": "complete-story",
+          "reason": "Preserve the original question, analogy and answer together; no internal joins before listening review."
+        }
+      ],
+      "captionMode": "word-highlight",
+      "visualMode": "speaker",
+      "fit": "cover",
+      "position": 50,
+      "review": {
+        "context": true,
+        "listened": false,
+        "text": false,
+        "approved": false
+      },
+      "emphasis": [
+        {
+          "start": 1583.86,
+          "end": 1586.28,
+          "kind": "quote",
+          "text": "أنت ملكش غيره أصلا"
+        },
+        {
+          "start": 1629.76,
+          "end": 1634.0,
+          "kind": "quote",
+          "text": "فلا تستعجل فتح الله"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "source": "/Users/abdozo/Documents/Apps/video-creator/projects_assets/Arta7/نفسي أرتاح _ _ أسباب الراحة في الحياة _ _ #خطبة_جمعة _ د . حازم شومان.mp4",
+  "sourceOffset": 1537.92,
+  "sourceDuration": 96.24,
+  "keep": [
+    {
+      "start": 0,
+      "end": 52.1
+    },
+    {
+      "start": 52.43333333333333,
+      "end": 55.4
+    },
+    {
+      "start": 55.733333333333334,
+      "end": 96.23333333333333
+    }
+  ],
+  "duration": 95.56666666666666,
+  "joins": [
+    52.1,
+    55.06666666666667
+  ],
+  "removed": [
+    {
+      "start": 52.1,
+      "end": 52.43333333333333
+    },
+    {
+      "start": 55.4,
+      "end": 55.733333333333334
+    }
+  ],
+  "pauseEvidence": {
+    "method": "FFmpeg silencedetect -30dB, minimum .25s; 125–160ms quiet padding retained",
+    "detected": [
+      [
+        51.974063,
+        52.5925
+      ],
+      [
+        55.249813,
+        55.880313
+      ]
+    ],
+    "listened": false
+  },
+  "transcriptPolicy": "Fresh ASR from edited source audio only. No original TXT, previous captions or forced text used.",
+  "display": "contain; entire source width; no animated zoom; no sharpening/upscaling pass beyond 854-to-1080 width fit"
+}

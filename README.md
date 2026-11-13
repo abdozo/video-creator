@@ -23,6 +23,7 @@ Each element draws in on its own cue. See the [approved style reference](media/t
 | --- | --- | --- |
 | `motion` | Motion graphics | Code-native text, shapes, diagrams, and animation. |
 | `whiteboard` | Classic whiteboard | Bold marker lettering and independently drawn elements on white. |
+| `dawah-clips` | [Dawah clips](media/templates/dawah-clips/README.md) | Assemble a story from passages anywhere in a recorded lesson, with Arabic captions and emphasis. |
 | `company-analysis` | [Company analysis](media/templates/company-analysis/README.md) | Research terminal, news, fundamentals, multi-timeframe charts and drawn analysis tools. |
 | `lines-anime` | [Lines Anime](media/templates/lines-anime/README.md) | Turn a supplied illustration into a story with movable SVG characters and diagrams. |
 | `motion-comic-static` | [Motion Comic Static](#motion-comic-static) | Still artwork in fixed comic panels with reveals, camera moves, and layered effects. |

@@ -845,6 +845,60 @@
       "used_in": [
         "short-9-chords"
       ]
+    },
+    {
+      "id": "paper-handling-cc0-1",
+      "file": "clips/paper-handling-cc0-1.mp3",
+      "category": "paper",
+      "tags": [
+        "paper",
+        "foley",
+        "non-musical",
+        "cc0"
+      ],
+      "duration_s": 0.488,
+      "peak_dbfs": -1.7,
+      "source": "https://opengameart.org/content/various-paper-sound-effects",
+      "license": "CC0-1.0; https://creativecommons.org/publicdomain/zero/1.0/",
+      "prompt": "Luckius; paper_sound_-_1.mp3; https://opengameart.org/sites/default/files/paper_sound_-_1.mp3; verified 2026-11-12",
+      "used_in": [
+        "short-18-the-closed-door"
+      ]
+    },
+    {
+      "id": "paper-handling-cc0-2",
+      "file": "clips/paper-handling-cc0-2.mp3",
+      "category": "paper",
+      "tags": [
+        "paper",
+        "foley",
+        "non-musical",
+        "cc0"
+      ],
+      "duration_s": 0.546,
+      "peak_dbfs": -5.3,
+      "source": "https://opengameart.org/content/various-paper-sound-effects",
+      "license": "CC0-1.0; https://creativecommons.org/publicdomain/zero/1.0/",
+      "prompt": "Luckius; paper_sound_-_2.mp3; https://opengameart.org/sites/default/files/paper_sound_-_2.mp3; verified 2026-11-12",
+      "used_in": [
+        "short-18-the-closed-door"
+      ]
+    },
+    {
+      "id": "air-swish-local",
+      "file": "clips/air-swish-local.mp3",
+      "category": "motion",
+      "tags": [
+        "air",
+        "non-musical",
+        "local"
+      ],
+      "duration_s": 0.46,
+      "peak_dbfs": -6.5,
+      "source": "repo:tools/synthesize_foley.py;kind=air-swish;seed=7",
+      "license": "MIT; repository LICENSE; procedural audio without external samples",
+      "prompt": "Deterministic procedural noise foley; provenance preserved in media/templates/dawah-clips/air-swish-local.provenance.json",
+      "used_in": []
     }
   ]
 }

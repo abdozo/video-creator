@@ -1,0 +1,24 @@
+[aist#0:0/pcm_s16le @ 0x755d408180] Guessed Channel Layout: mono
+Input #0, wav, from 'sources/dawah/arta7/audio-only-v2/source.wav':
+  Metadata:
+    encoder         : Lavf63.1.101
+  Duration: 00:01:36.24, bitrate: 256 kb/s
+  Stream #0:0: Audio: pcm_s16le ([1][0][0][0] / 0x0001), 16000 Hz, mono, s16, 256 kb/s
+Stream mapping:
+  Stream #0:0 -> #0:0 (pcm_s16le (native) -> pcm_s16le (native))
+Output #0, null, to 'pipe:':
+  Metadata:
+    encoder         : Lavf63.1.101
+  Stream #0:0: Audio: pcm_s16le, 16000 Hz, mono, s16, 256 kb/s
+    Metadata:
+      encoder         : Lavc63.1.101 pcm_s16le
+[Parsed_silencedetect_0 @ 0x755c8309c0] silence_start: 4.694937
+[Parsed_silencedetect_0 @ 0x755c8309c0] silence_end: 4.955125 | silence_duration: 0.260188
+[Parsed_silencedetect_0 @ 0x755c8309c0] silence_start: 51.974063
+[Parsed_silencedetect_0 @ 0x755c8309c0] silence_end: 52.5925 | silence_duration: 0.618437
+[Parsed_silencedetect_0 @ 0x755c8309c0] silence_start: 55.249813
+[Parsed_silencedetect_0 @ 0x755c8309c0] silence_end: 55.880313 | silence_duration: 0.6305
+[Parsed_silencedetect_0 @ 0x755c8309c0] silence_start: 85.964
+[Parsed_silencedetect_0 @ 0x755c8309c0] silence_end: 86.343 | silence_duration: 0.379
+[out#0/null @ 0x755c830180] video:0KiB audio:3008KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: unknown
+size=N/A time=00:01:36.24 bitrate=N/A speed=3.6e+03x elapsed=0:00:00.02    
